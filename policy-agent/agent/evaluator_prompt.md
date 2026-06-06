@@ -33,6 +33,13 @@ ATTACHED DATA (normalized — may be partial):
 - **ESCALATE** if you cannot confirm safety: data is opaque/unreadable/binary, content was truncated
   or missing, the case looks mixed-domain, or you are genuinely uncertain. Never guess ALLOW to be
   helpful — escalate instead.
+- **Redaction placeholders are NOT proprietary data.** This data may have already passed through the
+  downstream redactor. A value that has been replaced by a bracketed ALL-CAPS placeholder token
+  (e.g. `[PATIENT]`, `[MRN]`, `[DOB]`, `[DATE]`, `[PROVIDER]`, `[FACILITY]`, `[REDACTED]`), or a date
+  already reduced to a bare year, is *already neutralized* — do NOT raise a finding for it. An empty
+  label with no value after it (e.g. "MRN:" followed by nothing) is also not a finding. Only flag
+  actual, un-redacted sensitive values. If every sensitive value is a placeholder or absent, return
+  ALLOW.
 
 ## Output
 Set matched_case to "{case_id}". Respond ONLY with the structured object required by the

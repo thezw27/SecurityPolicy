@@ -47,6 +47,24 @@ Detect the **18 HIPAA identifiers**. The presence of *any* identifier tied to cl
 - Ambiguous whether a name refers to a patient vs. a public author/guideline.
 - Classifier confidence below the registry threshold.
 
+## 5b. Already-redacted data (→ ALLOW)
+This document may be a *re-check* of output from the downstream redactor
+(`redact-healthcare.py` + `rules/healthcare.yaml`). That engine replaces PHI with these
+placeholder tokens — **their presence means the field was already removed, so they are NOT findings**:
+
+| Token | Was | Rule |
+|-------|-----|------|
+| `[PATIENT]` | patient name (all variants) | HC-PATIENT |
+| `[MRN]` | medical record number | HC-MRN |
+| `[DOB]` | date of birth | HC-DOB |
+| `[PROVIDER]` | care-provider name | HC-PROVIDER |
+| `[FACILITY]` | hospital/facility name | HC-FACILITY |
+| bare year only (e.g. `2026`) | a full calendar date, generalized | HC-DATE |
+
+If all identifiers in the document are placeholders/absent and only clinical content + retained
+items (age < 90, bare years, relative intervals) remain, the verdict is **ALLOW** — the redactor did
+its job and the document may go to the cloud.
+
 ## 6. Notes for the data massager (out of scope, courtesy)
 - `mask` names/MRN/contact to stable tokens (so the model can still refer to "the patient").
 - `generalize` dates to relative offsets (e.g. "hospital day 3") or month-only; ages over 89 → "90+".

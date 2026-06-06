@@ -107,6 +107,40 @@ unreadable-data case never depends on model strength.
 Real controller backups and patient PDFs are **never committed** (see `.gitignore`). The repo ships
 only synthetic fixtures in `harness/fixtures/`. Real files are read locally for `--real` validation.
 
+## End-to-end integration (`../orchestrator.py`)
+
+The repo-root `orchestrator.py` wires all four ApexClaw components into one flow:
+
+```
+box_openrouter_pipeline (prompt + Box -> local LLM draft)
+  -> hallucination_detector (trustworthy? no -> STOP)
+  -> policy-agent           (ALLOW -> cloud | ESCALATE -> human | BLOCK -> massager)
+  -> redact-healthcare.py   (Emma's PHI redactor, fail-closed)
+  -> re-feed redacted doc back into policy-agent  (loop until ALLOW / ESCALATE)
+```
+
+Run it on a local doc (Box + hallucination stages are optional, since they need live creds):
+
+```bash
+python ../orchestrator.py --provider openrouter --model google/gemini-2.5-flash \
+  --prompt "Attached is a patient discharge summary, find any follow-ups." \
+  --doc data/healthcare/01_discharge_heart_failure_Okafor.pdf
+# loop 1 BLOCK (PHI) -> redactor (CLEAR) -> loop 2 ALLOW -> SEND_TO_CLOUD (redacted doc)
+```
+
+**Two integration contracts that make the loop converge:**
+1. **Redaction-token awareness.** The massager replaces PHI with placeholder tokens
+   (`[PATIENT]`, `[MRN]`, `[DOB]`, `[PROVIDER]`, `[FACILITY]`, year-only dates). The evaluator prompt
+   and healthcare policy treat those tokens as *already neutralized* (not findings) — otherwise the
+   policy agent would re-flag them forever and the loop would never end.
+2. **Massager coverage.** A massager exists only for `healthcare` PDFs today. `industrial_ot` BLOCK
+   currently routes to **human review** (no massager yet) — handled gracefully by the orchestrator.
+
+**Model note:** the *post-redaction re-check* needs a capable evaluator. The small local-class
+default (`llama-3.1-8b`) is reliable for the initial BLOCK but over-flags cleaned docs (confabulates
+PHI on empty fields), so the loop only converges with a stronger model (e.g. `google/gemini-2.5-flash`).
+Pass it via `--model`.
+
 ## Layout
 
 ```
