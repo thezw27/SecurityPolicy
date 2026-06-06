@@ -1,0 +1,150 @@
+---
+title: "ApexClaw — Background Documentation"
+subtitle: "The data-protection pipeline: flow, components, and contracts"
+date: 2026-06-06
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    theme: cosmo
+    code-overflow: wrap
+---
+
+## Why this exists
+
+Frontier cloud models give the best answers, but much of the data an enterprise would
+send them is **legally or commercially un-sendable**: regulated PHI/PII (HIPAA), operational-
+technology secrets (controller network config, credentials, robot programs), trade secrets,
+and export-controlled technical data.
+
+ApexClaw's bet: **answer locally when you can, and only escalate to the cloud once a gate has
+confirmed the data is safe — or made it safe.** The user gets frontier-grade answers; the
+sensitive bits never leave.
+
+> Note: in this hackathon build, the "local" small models are simulated via cloud APIs
+> (OpenRouter / Gemini). The design is model-agnostic, so a true on-prem model drops in later.
+
+## The end-to-end flow
+
+```{mermaid}
+flowchart TD
+    A[User prompt + documents from Box via MCP] --> B[Small 'local' LLM drafts an answer]
+    B --> C{Hallucination check}
+    C -- trustworthy --> D[Return local answer · STOP]
+    C -- not trustworthy --> E[[POLICY AGENT · local]]
+    E --> F{Contains proprietary data?}
+    F -- no --> G[Send prompt + data to frontier cloud model · STOP]
+    F -- uncertain / unreadable --> H[Human review · STOP]
+    F -- yes --> I[Data massager / redactor]
+    I --> E
+    style E fill:#1b5e20,stroke:#4caf50,color:#fff
+    style I fill:#4a148c,stroke:#ba68c8,color:#fff
+```
+
+The whole chain is wired in repo-root **`orchestrator.py`**. The Box retrieval and
+hallucination stages need live credentials, so the orchestrator can also start at the
+policy gate from a local document — which is the part that runs fully offline-capable.
+
+## The components
+
+### Box retrieval + local LLM — `box_openrouter_pipeline.py`
+Lists files in a Box folder, lets a planner model pick the relevant ones, downloads and
+extracts their text (PDF/DOCX/CSV/XLSX/…), and asks a small "local" model to answer using
+that content. Output: a draft `answer`.
+
+### Hallucination check — `hallucination_detector.py`
+Decides whether the local answer can be trusted. Domain-aware:
+
+- **Robotics:** any cited error code must exist in the manual; an invented code = hallucination.
+- **Healthcare follow-up:** a follow-up date must be present, valid, and in the future.
+
+If the answer is trustworthy → **stop and return it** (no cloud, no risk). If not → **escalate**
+to the policy agent. *This escalation is the entry point of our scope.*
+
+### Policy Agent — `policy-agent/` (the gate)
+Runs locally and decides whether prompt + data may be sent to the cloud. Two stages:
+
+1. **Classify** (`agent/classifier_prompt.md`) — route the prompt+data to a use-case using
+   signals in `policies/registry.yaml`. Low confidence / unknown / mixed-domain → `ESCALATE`.
+2. **Evaluate** (`agent/evaluator_prompt.md`) — apply that case's `policies/<case>/policy.md`
+   and emit a structured verdict.
+
+**Intake** (`src/intake.py`) is format-flexible: PDFs (text extraction), controller-backup
+*folders* (walks the tree, extracts text from XML/cfg/txt, flags binaries as opaque), raw text,
+or metadata-only. Anything it can't read is recorded so the agent can escalate rather than
+assume safety.
+
+A model-independent guard deterministically **ESCALATEs** any attachment whose contents can't
+be extracted — the unreadable case never depends on model strength.
+
+### Data massager / redactor — `redact-healthcare.py`
+Owns *what* counts as PHI and *how* it's removed (rules in `rules/healthcare.yaml`, HIPAA Safe
+Harbor). It performs **true redaction** (removes the underlying glyphs, not a black box over
+them), writes placeholder tokens, then **re-scans the output and fails closed** — it will not
+emit a document that still contains detectable PHI. Clinical content (diagnoses, meds, ages < 90)
+is deliberately preserved so the cloud model can still do useful work.
+
+## The verdict contract
+
+`agent/schema/verdict.schema.json` — a three-state decision plus the findings that justify it:
+
+| Verdict | Meaning | Next |
+|--------|---------|------|
+| `ALLOW` | no proprietary data | forward to frontier cloud model |
+| `BLOCK` | proprietary data present | hand `findings[]` to the redactor |
+| `ESCALATE` | can't confirm safety | human review |
+
+Each finding carries `category`, `location` (field/file/snippet), `severity`, `rationale`, and a
+`redaction_hint` (`mask` / `drop` / `generalize`) — enough for the redactor to act without
+re-discovering everything.
+
+## The integration insight: contracts between components
+
+Two agreements make the **BLOCK → redact → re-check** loop actually terminate:
+
+1. **Redaction-token awareness.** The redactor replaces PHI with placeholders
+   (`[PATIENT]`, `[MRN]`, `[DOB]`, `[PROVIDER]`, `[FACILITY]`, year-only dates). Initially the
+   policy agent saw `[MRN]` and reported "MRN detected" — re-blocking the redactor's own clean
+   output indefinitely. The fix (in `evaluator_prompt.md` and healthcare `policy.md` §5b): treat
+   those tokens as *already neutralized*, not findings. With that shared vocabulary, a redacted
+   document re-checks to `ALLOW` and the loop converges.
+
+2. **Massager coverage is explicit.** A redactor exists only for `healthcare` PDFs today, so an
+   `industrial_ot` BLOCK has nothing to clean it — the orchestrator routes that to **human review**
+   rather than failing silently.
+
+## Running it
+
+```bash
+# one-time
+pip install -r policy-agent/requirements.txt    # + PyMuPDF for the redactor
+cp policy-agent/.env.example policy-agent/.env   # add OPENROUTER_API_KEY
+
+# policy agent on its own (synthetic fixtures, offline)
+python policy-agent/harness/run_validation.py --provider mock
+
+# full pipeline, end to end (capable evaluator for the re-check)
+python orchestrator.py --provider openrouter --model google/gemini-2.5-flash \
+  --prompt "Attached is a patient discharge summary, find any follow-ups." \
+  --doc data/healthcare/01_discharge_heart_failure_Okafor.pdf
+```
+
+Expected: `BLOCK` (PHI) → redactor `CLEAR` → `ALLOW` → `SEND_TO_CLOUD` (the **redacted** doc).
+
+## Validation & limitations
+
+- **9/9** validation (synthetic + real local data); every real backup/PDF correctly blocked, the
+  ambiguous/opaque case escalates, de-identified content is allowed.
+- **Model strength:** the small local-class default (`llama-3.1-8b`) is reliable for the initial
+  BLOCK but over-flags already-redacted docs; the loop converges with a stronger evaluator
+  (e.g. `gemini-2.5-flash`). A two-tier "small gate, capable verifier" split is the natural answer.
+- **Coverage:** healthcare redaction only; `industrial_ot` redactor is the next piece.
+- **Fail-safe posture:** unknown case, unreadable data, or low confidence all route to a human —
+  the system never guesses "safe."
+
+## Next steps
+
+- An `industrial_ot` massager (mask network/credentials, generalize trajectories).
+- A shared config (one `.env`, one confidence threshold) across all four components.
+- Aligning the hallucination detector's domain labels with the policy agent's case ids.

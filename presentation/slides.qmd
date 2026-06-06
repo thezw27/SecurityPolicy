@@ -1,0 +1,150 @@
+---
+title: "ApexClaw"
+subtitle: "Keeping proprietary data off the cloud — a local policy gate + redaction loop"
+date: 2026-06-06
+format:
+  revealjs:
+    theme: night
+    transition: slide
+    slide-number: true
+    width: 1280
+    height: 720
+    incremental: false
+    code-line-numbers: false
+    mermaid:
+      theme: dark
+---
+
+## The problem {.smaller}
+
+Frontier cloud models are powerful — but a lot of the data we'd send them **can't leave the building**:
+
+- 🏥 **PHI** — patient names, MRNs, dates (HIPAA)
+- 🏭 **OT secrets** — controller network config, credentials, robot programs
+- 🔒 **Trade secrets & export-controlled** data
+
+::: {.fragment}
+**Goal:** get frontier-model answers *without* leaking the sensitive bits.
+
+The idea: try a small **local** model first; only escalate to the cloud after a gate
+confirms (or makes) the data safe to send.
+:::
+
+## The full flow
+
+```{mermaid}
+flowchart LR
+    A[Prompt + Box docs] --> B[Local LLM<br/>draft answer]
+    B --> C{Hallucination<br/>check}
+    C -- trustworthy --> D[Return answer · STOP]
+    C -- escalate --> E[POLICY AGENT]
+    E --> F{Proprietary?}
+    F -- no --> G[Send to cloud · STOP]
+    F -- uncertain --> H[Human review]
+    F -- yes --> I[Redactor]
+    I -- re-check --> E
+    style E fill:#1b5e20,stroke:#4caf50,color:#fff
+    style I fill:#4a148c,stroke:#ba68c8,color:#fff
+```
+
+::: {.fragment}
+Four components, four owners — chained into one pipeline (`orchestrator.py`).
+:::
+
+## The components {.smaller}
+
+| Stage | Does | Key idea |
+|------|------|----------|
+| **Box + local LLM** | Pulls relevant files, drafts an answer locally | cheap & private first |
+| **Hallucination check** | Is the local answer trustworthy? | if yes → stop, no cloud needed |
+| **Policy Agent** | Decides if data may go to the cloud | the gate — *this talk* |
+| **Redactor** | Removes the sensitive bits, proves it | fail-closed |
+
+::: {.fragment}
+Only data the local model *can't* handle ever reaches the gate — and only **clean** data ever reaches the cloud.
+:::
+
+## The Policy Agent — the gate {.smaller}
+
+Runs **locally**, two stages:
+
+```{mermaid}
+flowchart LR
+    I[prompt + data] --> C[1 · Classify<br/>which case?]
+    C --> E[2 · Evaluate<br/>apply that policy]
+    E --> V{verdict}
+    V --> A[ALLOW → cloud]
+    V --> B[BLOCK → redactor]
+    V --> H[ESCALATE → human]
+```
+
+- **Modular policies** per use-case (`healthcare`, `industrial_ot`) + extensible registry
+- **3-state** verdict — never a silent leak; when unsure → **human**
+- A deterministic guard escalates anything it *can't even read* (opaque/binary)
+
+## Structured output → drives redaction {.smaller}
+
+The gate doesn't just say "no" — it says **what, where, and how to fix**:
+
+```json
+{
+  "verdict": "BLOCK",
+  "matched_case": "healthcare",
+  "matched_policy_rules": ["HC-1", "HC-2", "HC-3"],
+  "findings": [
+    {"category": "phi", "location": "MRN: NL-448821",
+     "severity": "high", "redaction_hint": "mask"},
+    {"category": "phi", "location": "DOB 09/14/1951",
+     "severity": "high", "redaction_hint": "generalize"}
+  ]
+}
+```
+
+This contract is what the **redactor** consumes.
+
+## The redaction loop {.smaller}
+
+On **BLOCK**, the redactor strips PHI (true removal, then re-scans — fail-closed),
+and the cleaned doc is **re-checked by the gate** until it passes.
+
+::: {.fragment}
+**The catch that made or broke it:** the redactor leaves placeholder tokens
+`[PATIENT] [MRN] [DOB] …`. The gate first saw those and said *"PHI detected!"* —
+re-blocking the redactor's own output **forever.**
+:::
+
+::: {.fragment}
+**Fix = a shared contract.** Teach the gate that those tokens mean *already removed* → ALLOW.
+That single agreement is what lets the loop **converge**.
+:::
+
+## It works — end to end {.smaller}
+
+Real discharge PDF, real OpenRouter model:
+
+```
+loop 1: BLOCK  (14 PHI findings)  → redactor: 50 redactions, CLEAR
+loop 2: ALLOW                      → SEND_TO_CLOUD (redacted doc)
+```
+
+- Validated **9/9** (synthetic + real data) — every real backup/PDF correctly blocked
+- The doc that reaches the cloud is the **redacted** one, never the original
+
+## Design choices & honest limits {.smaller}
+
+- ✅ **Model-agnostic** — runs on any OpenRouter/Gemini model; default is a small **local-class** 8B
+- ⚠️ **Small model over-flags on re-check** (confabulates PHI on cleaned docs) → the loop needs a
+  *capable* evaluator for the verification step
+- ⚠️ **Redaction is healthcare-only today** → `industrial_ot` BLOCK routes to human review
+- ✅ **Fail-safe by construction** — unknown / unreadable / uncertain → human, never a leak
+
+## Takeaways
+
+- A small **local gate** can let you use frontier models **without leaking** sensitive data
+- The hard part isn't any one component — it's the **contracts between them**
+  (structured findings ↔ redaction tokens)
+- **Next:** an `industrial_ot` redactor, a shared confidence/threshold config, one `.env`
+
+::: {.fragment}
+**Thank you** — questions?
+:::

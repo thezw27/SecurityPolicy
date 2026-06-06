@@ -1,0 +1,7 @@
+project:
+  title: "ApexClaw — Policy Agent"
+  output-dir: _output
+
+# Renders both the slide deck (slides.qmd) and the background docs (documentation.qmd).
+# Build:   quarto render presentation
+# Preview: quarto preview presentation/slides.qmd
