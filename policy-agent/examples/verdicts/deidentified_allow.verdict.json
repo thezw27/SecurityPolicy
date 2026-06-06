@@ -1,0 +1,11 @@
+{
+  "_input": "deidentified_allow.json",
+  "_provider": "openrouter",
+  "_model": "meta-llama/llama-3.1-8b-instruct",
+  "verdict": "ALLOW",
+  "matched_case": "healthcare",
+  "classification_confidence": 0.8,
+  "explanation": "No proprietary items detected in the prompt or data. The question is generic and does not contain any patient-specific identifiers.",
+  "matched_policy_rules": [],
+  "findings": []
+}

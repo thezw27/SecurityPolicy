@@ -1,0 +1,60 @@
+{
+  "_input": "discharge_block.json",
+  "_provider": "openrouter",
+  "_model": "meta-llama/llama-3.1-8b-instruct",
+  "verdict": "BLOCK",
+  "matched_case": "healthcare",
+  "classification_confidence": 0.9,
+  "explanation": "The attached data contains multiple proprietary items, including patient name, medical record number, date of birth, age, facility name, and provider name. Therefore, the data must be blocked from being sent to the cloud model.",
+  "matched_policy_rules": [
+    "HC-1",
+    "HC-2",
+    "HC-3",
+    "HC-5",
+    "HC-7"
+  ],
+  "findings": [
+    {
+      "category": "phi",
+      "location": "Patient: Demo, Jane Q.",
+      "severity": "high",
+      "rationale": "Patient name",
+      "redaction_hint": "mask"
+    },
+    {
+      "category": "phi",
+      "location": "MRN: NL-990001",
+      "severity": "high",
+      "rationale": "Medical record number",
+      "redaction_hint": "mask"
+    },
+    {
+      "category": "phi",
+      "location": "DOB: 02/11/1950",
+      "severity": "high",
+      "rationale": "Date of birth",
+      "redaction_hint": "generalize"
+    },
+    {
+      "category": "phi",
+      "location": "Age/Sex: 76 F",
+      "severity": "med",
+      "rationale": "Age over 89",
+      "redaction_hint": "generalize"
+    },
+    {
+      "category": "phi",
+      "location": "NORTHLAKE REGIONAL MEDICAL CENTER",
+      "severity": "med",
+      "rationale": "Facility name",
+      "redaction_hint": "generalize"
+    },
+    {
+      "category": "phi",
+      "location": "Attending: Dr. A. Sample, MD",
+      "severity": "med",
+      "rationale": "Provider name",
+      "redaction_hint": "mask"
+    }
+  ]
+}

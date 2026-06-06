@@ -1,0 +1,62 @@
+# Policy registry — the single source of truth for which cases exist and how to route to them.
+# The Stage-1 classifier reads `signals` to help match prompt+data to a case.
+# To add a domain: copy policies/_template, fill in policy.md, and add an entry here. No code changes.
+
+version: 1
+
+# Below this confidence the agent returns ESCALATE instead of guessing a case.
+classification_confidence_threshold: 0.6
+
+cases:
+  - id: industrial_ot
+    title: Industrial / OT — robot & PLC controller backups, configs, logs
+    policy_file: industrial_ot/policy.md
+    # Hints the classifier uses to recognize this case. Not exhaustive, not regex-strict.
+    signals:
+      filenames:
+        - "*.mod"          # ABB RAPID program modules
+        - "*.sys"          # RAPID system modules
+        - "*.cfg"          # controller config
+        - "netconfig.db"
+        - "system.xml"
+        - "RW6system.xml"
+        - "uas_application_grants.xml"
+        - "*restore*"      # RobotStudio "...restore" backup folders
+      keywords:
+        - controller
+        - backup
+        - RAPID
+        - PLC
+        - robot
+        - ABB
+        - IRB
+        - "error log"
+        - elog
+        - teach pendant
+      file_types: [folder, xml, cfg, txt, mod, sys, db]
+
+  - id: healthcare
+    title: Healthcare — clinical documents containing PHI
+    policy_file: healthcare/policy.md
+    signals:
+      filenames:
+        - "*discharge*"
+        - "*summary*"
+        - "*patient*"
+      keywords:
+        - patient
+        - discharge
+        - diagnosis
+        - MRN
+        - "medical record"
+        - attending
+        - admitted
+        - follow-up
+        - prescription
+        - clinical
+      file_types: [pdf, docx, txt]
+
+# Reserved for future re-introduction (currently out of scope, see plan):
+#   - id: simulation
+#     title: Engineering simulation (CFD/FEA) — VTU, mesh, ANSYS
+#     policy_file: simulation/policy.md

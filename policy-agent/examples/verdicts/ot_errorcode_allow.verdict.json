@@ -1,0 +1,11 @@
+{
+  "_input": "ot_errorcode_allow.json",
+  "_provider": "openrouter",
+  "_model": "meta-llama/llama-3.1-8b-instruct",
+  "verdict": "ALLOW",
+  "matched_case": "industrial_ot",
+  "classification_confidence": 0.8,
+  "explanation": "The prompt and attached data do not contain any proprietary items defined in the policy.",
+  "matched_policy_rules": [],
+  "findings": []
+}

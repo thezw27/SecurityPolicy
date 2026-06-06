@@ -1,0 +1,11 @@
+{
+  "_input": "ambiguous_escalate.json",
+  "_provider": "openrouter",
+  "_model": "meta-llama/llama-3.1-8b-instruct",
+  "verdict": "ESCALATE",
+  "matched_case": "unknown",
+  "classification_confidence": 0.0,
+  "explanation": "Attachment present but no content could be extracted (opaque/binary/unreadable); cannot rule out proprietary data. Routing to human review.",
+  "matched_policy_rules": [],
+  "findings": []
+}

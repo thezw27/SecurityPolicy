@@ -1,0 +1,13 @@
+# Core
+PyYAML>=6.0
+python-dotenv>=1.0        # loads .env (keys / POLICY_PROVIDER)
+
+# Intake (PDF text extraction). Optional but needed for real discharge PDFs.
+pypdf>=4.0
+
+# Providers (install only what you use)
+requests>=2.31            # OpenRouter
+google-generativeai>=0.7  # Gemini
+# anthropic>=0.39         # optional, only if an Anthropic key becomes available
+
+# mock provider needs none of the above (offline smoke runs with just PyYAML)

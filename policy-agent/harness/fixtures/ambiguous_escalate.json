@@ -1,0 +1,11 @@
+{
+  "note": "Vague prompt + opaque/unreadable attachment, no routing signals. Cannot classify or confirm safety. Expect ESCALATE.",
+  "prompt": "Please process the attached file and tell me what you find.",
+  "source": {
+    "filenames": ["export_20260606.bin"],
+    "file_types": ["bin"],
+    "file_inventory": ["export_20260606.bin"],
+    "extracted_text": "",
+    "missing": ["export_20260606.bin: opaque/binary — contents not inspected; could not extract text"]
+  }
+}

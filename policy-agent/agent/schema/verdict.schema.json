@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PolicyAgentVerdict",
+  "description": "Structured output of the Policy Agent. Three-state gate decision plus the findings that justify it. Consumed downstream by the (out-of-scope) data massager.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "matched_case", "classification_confidence", "findings", "explanation"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["ALLOW", "BLOCK", "ESCALATE"],
+      "description": "ALLOW = no proprietary data, forward to cloud. BLOCK = proprietary data found, hand findings to massager. ESCALATE = uncertain/unknown, route to human review."
+    },
+    "matched_case": {
+      "type": "string",
+      "enum": ["industrial_ot", "healthcare", "unknown"],
+      "description": "The use-case the classifier routed to. 'unknown' forces ESCALATE."
+    },
+    "classification_confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Stage-1 router confidence in matched_case. Below the configured threshold forces ESCALATE."
+    },
+    "matched_policy_rules": {
+      "type": "array",
+      "description": "IDs of the policy rules that fired (e.g. OT-3, HC-1). Empty for ALLOW.",
+      "items": { "type": "string" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "One entry per piece of proprietary data detected. Empty for ALLOW.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "location", "severity", "rationale", "redaction_hint"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["phi", "pii", "secret", "ip", "credential", "network", "export_control", "other"],
+            "description": "Type of sensitive data."
+          },
+          "location": {
+            "type": "string",
+            "description": "Where it was found: field name, file path, line, or a short verbatim snippet."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "med", "high"]
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this is proprietary under the matched policy."
+          },
+          "redaction_hint": {
+            "type": "string",
+            "enum": ["mask", "drop", "generalize"],
+            "description": "Courtesy hint to the downstream data massager. mask=replace with token, drop=remove entirely, generalize=coarsen (e.g. exact date -> month)."
+          }
+        }
+      }
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Short human-readable summary of the decision."
+    }
+  }
+}

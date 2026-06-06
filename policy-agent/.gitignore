@@ -1,0 +1,17 @@
+# --- LEAK GUARD: never commit real proprietary / PHI data ---
+# Real controller backups and patient documents are used for local validation only.
+local_data/
+*.restore/
+*restore/
+*_discharge_*.pdf
+*discharge*.pdf
+*.bin
+*.db
+*.id
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env

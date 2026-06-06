@@ -1,0 +1,53 @@
+{
+  "_input": "ot_backup_block.json",
+  "_provider": "openrouter",
+  "_model": "meta-llama/llama-3.1-8b-instruct",
+  "verdict": "BLOCK",
+  "matched_case": "industrial_ot",
+  "classification_confidence": 0.9,
+  "explanation": "The attached ABB controller backup contains proprietary data, including network configuration, credentials, secrets, and IP addresses. Therefore, the data must be blocked from being sent to the cloud.",
+  "matched_policy_rules": [
+    "OT-1",
+    "OT-2",
+    "OT-3",
+    "OT-4",
+    "OT-5"
+  ],
+  "findings": [
+    {
+      "category": "network",
+      "location": "netconfig.db",
+      "severity": "high",
+      "rationale": "IP address and subnet found in netconfig.db",
+      "redaction_hint": "mask"
+    },
+    {
+      "category": "credential",
+      "location": "INTERNAL/uas_application_grants.xml",
+      "severity": "high",
+      "rationale": "UAS grant found in uas_application_grants.xml",
+      "redaction_hint": "drop"
+    },
+    {
+      "category": "secret",
+      "location": "INTERNAL/key.id",
+      "severity": "high",
+      "rationale": "System GUID and key found in key.id",
+      "redaction_hint": "mask"
+    },
+    {
+      "category": "ip",
+      "location": "HOME/eef_pos_roll_1_020320.txt",
+      "severity": "high",
+      "rationale": "Proprietary RAPID program found in eef_pos_roll_1_020320.txt",
+      "redaction_hint": "generalize"
+    },
+    {
+      "category": "pii",
+      "location": "INTERNAL/log/elog.txt",
+      "severity": "med",
+      "rationale": "Operator name found in elog.txt",
+      "redaction_hint": "mask"
+    }
+  ]
+}
