@@ -1,0 +1,47 @@
+{
+  "policy": "healthcare-phi",
+  "standard": "hipaa_safe_harbor",
+  "source": "01_discharge_heart_failure_Okafor.pdf",
+  "timestamp": "2026-06-06T15:53:33",
+  "verdict": "CLEAR",
+  "redactions": [
+    {
+      "rule_id": "HC-DATE",
+      "category": "phi",
+      "replacement": "2026",
+      "count": 14
+    },
+    {
+      "rule_id": "HC-DOB",
+      "category": "phi",
+      "replacement": "[DOB]",
+      "count": 1
+    },
+    {
+      "rule_id": "HC-FACILITY",
+      "category": "pii",
+      "replacement": "[FACILITY]",
+      "count": 6
+    },
+    {
+      "rule_id": "HC-MRN",
+      "category": "pii",
+      "replacement": "[MRN]",
+      "count": 16
+    },
+    {
+      "rule_id": "HC-PATIENT",
+      "category": "phi",
+      "replacement": "[PATIENT]",
+      "count": 10
+    },
+    {
+      "rule_id": "HC-PROVIDER",
+      "category": "pii",
+      "replacement": "[PROVIDER]",
+      "count": 3
+    }
+  ],
+  "total_redactions": 50,
+  "residual_after_rescan": []
+}

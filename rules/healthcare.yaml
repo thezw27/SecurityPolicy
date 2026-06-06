@@ -1,0 +1,93 @@
+# =============================================================================
+# Healthcare PHI redaction rules
+# Standard: HIPAA Safe Harbor (45 CFR 164.514(b)(2)) — strip the 18 identifiers,
+# preserve clinical content so an off-premise model can still reason on the case.
+#
+# Consumed by redact.py. The Policy Agent only decides "PHI present: yes" and
+# routes here; THIS file owns what counts as PHI and how each type is transformed.
+# =============================================================================
+
+policy: healthcare-phi
+standard: hipaa_safe_harbor
+version: 0.1
+
+# ---- Fail-closed posture -----------------------------------------------------
+defaults:
+  # After redaction we re-scan the OUTPUT. If any deterministic detector still
+  # fires, the document does NOT proceed — it is blocked, not "best effort".
+  on_verification_residual: block
+  # HIPAA: ages >= 90 must be redacted/aggregated; ages below are retained.
+  age_threshold_redact: 90
+
+# ---- Rules: each is one PHI type -> one transformation -----------------------
+# transform vocabulary:
+#   mask        token in place of value          (value gone, type visible)
+#   drop        remove value entirely
+#   generalize  reduce precision (date -> year)  (Safe Harbor for dates)
+#   pseudonym   stable token, same entity -> same token  (preserves coreference)
+rules:
+
+  - id: HC-MRN
+    category: pii
+    severity: high
+    description: Medical record number (Northlake format NL-######)
+    detect: { type: regex, pattern: '\bNL-\d{6}\b' }
+    transform: mask
+    replacement: '[MRN]'
+
+  - id: HC-DOB
+    category: phi
+    severity: high
+    description: Date of birth, numeric MM/DD/YYYY
+    detect: { type: regex, pattern: '\b\d{2}/\d{2}/\d{4}\b' }
+    transform: drop
+    replacement: '[DOB]'
+
+  - id: HC-DATE
+    category: phi
+    severity: med
+    description: >
+      Calendar dates (month-name day, year). Safe Harbor removes all date
+      elements finer than year -> we keep the year only. Bare 4-digit years
+      (e.g. "diagnosed 2019") are intentionally NOT matched and are retained.
+    detect:
+      type: regex
+      pattern: '\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}\b'
+    transform: generalize
+    replacement: '$YEAR'        # engine substitutes the captured year
+
+  - id: HC-PATIENT
+    category: phi
+    severity: high
+    description: >
+      Patient name in every variant — "Surname, Given M.", "Mr./Ms. Surname",
+      and the bare surname. Seeded from the structured page header, then all
+      occurrences (body, running header, footer) are pseudonymized.
+    detect: { type: dynamic, extractor: patient_name }
+    transform: pseudonym
+    replacement: '[PATIENT]'
+
+  - id: HC-PROVIDER
+    category: pii
+    severity: med
+    description: Care-provider names ("Dr. First Last", signature line).
+    detect: { type: dynamic, extractor: provider_name }
+    transform: pseudonym
+    replacement: '[PROVIDER]'
+
+  - id: HC-FACILITY
+    category: pii
+    severity: low
+    description: Facility / hospital name (context-identifying).
+    detect: { type: literal, values: ['Northlake Regional Medical Center'] }
+    transform: pseudonym
+    replacement: '[FACILITY]'
+
+# ---- Explicitly retained (the value proposition) -----------------------------
+# Documented so a reviewer can see these were a decision, not an oversight.
+keep:
+  - Ages under 90 (e.g. "74-year-old")
+  - Clinical findings, EF/BNP/GFR/creatinine values, vitals
+  - Medications, doses, routes, frequencies
+  - Relationships without names ("spouse", "wife")
+  - Bare years, relative intervals ("5-day history", "in 5-7 days")
