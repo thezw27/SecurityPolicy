@@ -1,5 +1,5 @@
 project:
-  title: "ApexClaw — Policy Agent"
+  title: "AgentCOP — Policy Agent"
   output-dir: _output
 
 # Renders both the slide deck (slides.qmd) and the background docs (documentation.qmd).

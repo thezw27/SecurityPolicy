@@ -1,6 +1,6 @@
 # Policy Agent
 
-A local, model-agnostic **data-loss-prevention gate** for the ApexClaw flow. It sits between an
+A local, model-agnostic **data-loss-prevention gate** for the AgentCOP flow. It sits between an
 on-prem/local model and a frontier **cloud** model and decides whether a prompt + its attached
 documents may be sent to the cloud, based on a per-use-case **policy** that defines what counts as
 proprietary.
@@ -96,7 +96,7 @@ Each file includes the `_provider`/`_model` used plus the verdict, matched case,
 ## Default model
 
 The default OpenRouter model is `meta-llama/llama-3.1-8b-instruct` — a small, **local-class** (8B)
-model representative of what would run on-prem as the ApexClaw "local LLM". It is reliable on the
+model representative of what would run on-prem as the AgentCOP "local LLM". It is reliable on the
 safety-critical BLOCK cases; for higher accuracy on nuanced ALLOW/ESCALATE calls, point
 `POLICY_MODEL` at a larger model (e.g. `google/gemini-2.5-flash`). A model-independent guard in
 `src/agent.py` deterministically ESCALATEs any attachment whose contents can't be extracted, so the
@@ -109,7 +109,7 @@ only synthetic fixtures in `harness/fixtures/`. Real files are read locally for 
 
 ## End-to-end integration (`../orchestrator.py`)
 
-The repo-root `orchestrator.py` wires all four ApexClaw components into one flow:
+The repo-root `orchestrator.py` wires all four AgentCOP components into one flow:
 
 ```
 box_openrouter_pipeline (prompt + Box -> local LLM draft)

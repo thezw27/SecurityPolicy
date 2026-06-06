@@ -1,5 +1,5 @@
 ---
-title: "ApexClaw — Background Documentation"
+title: "AgentCOP — Background Documentation"
 subtitle: "The data-protection pipeline: flow, components, and contracts"
 date: 2026-06-06
 format:
@@ -18,7 +18,7 @@ send them is **legally or commercially un-sendable**: regulated PHI/PII (HIPAA),
 technology secrets (controller network config, credentials, robot programs), trade secrets,
 and export-controlled technical data.
 
-ApexClaw's bet: **answer locally when you can, and only escalate to the cloud once a gate has
+AgentCOP's bet: **answer locally when you can, and only escalate to the cloud once a gate has
 confirmed the data is safe — or made it safe.** The user gets frontier-grade answers; the
 sensitive bits never leave.
 
@@ -48,12 +48,12 @@ policy gate from a local document — which is the part that runs fully offline-
 
 ## The components
 
-### Box retrieval + local LLM — `box_openrouter_pipeline.py`
+### Box retrieval + local LLM — `box_openrouter_pipeline.py` *(Zack)*
 Lists files in a Box folder, lets a planner model pick the relevant ones, downloads and
 extracts their text (PDF/DOCX/CSV/XLSX/…), and asks a small "local" model to answer using
 that content. Output: a draft `answer`.
 
-### Hallucination check — `hallucination_detector.py`
+### Hallucination check — `hallucination_detector.py` *(Abhiyan & Nav)*
 Decides whether the local answer can be trusted. Domain-aware:
 
 - **Robotics:** any cited error code must exist in the manual; an invented code = hallucination.
@@ -62,7 +62,7 @@ Decides whether the local answer can be trusted. Domain-aware:
 If the answer is trustworthy → **stop and return it** (no cloud, no risk). If not → **escalate**
 to the policy agent. *This escalation is the entry point of our scope.*
 
-### Policy Agent — `policy-agent/` (the gate)
+### Policy Agent — `policy-agent/` (the gate) *(Ammar)*
 Runs locally and decides whether prompt + data may be sent to the cloud. Two stages:
 
 1. **Classify** (`agent/classifier_prompt.md`) — route the prompt+data to a use-case using
@@ -78,7 +78,7 @@ assume safety.
 A model-independent guard deterministically **ESCALATEs** any attachment whose contents can't
 be extracted — the unreadable case never depends on model strength.
 
-### Data massager / redactor — `redact-healthcare.py`
+### Data massager / redactor — `redact-healthcare.py` *(Emma)*
 Owns *what* counts as PHI and *how* it's removed (rules in `rules/healthcare.yaml`, HIPAA Safe
 Harbor). It performs **true redaction** (removes the underlying glyphs, not a black box over
 them), writes placeholder tokens, then **re-scans the output and fails closed** — it will not
@@ -131,6 +131,32 @@ python orchestrator.py --provider openrouter --model google/gemini-2.5-flash \
 ```
 
 Expected: `BLOCK` (PHI) → redactor `CLEAR` → `ALLOW` → `SEND_TO_CLOUD` (the **redacted** doc).
+
+## Worked examples (real runs)
+
+These are actual outputs, referenced so the deck doesn't need a live demo. (Patient data is synthetic.)
+
+**Healthcare — `data/healthcare/01_discharge_heart_failure_Okafor.pdf`**, prompt *"find any follow-ups"*:
+
+```
+loop 1: BLOCK  (14 PHI findings)  → redactor: 50 redactions, CLEAR
+loop 2: ALLOW                      → SEND_TO_CLOUD (redacted doc)
+```
+
+Sample findings: HC-1 name `Okafor, Emmanuel C.`, HC-2 MRN `NL-448821`, HC-3 DOB `09/14/1951`,
+HC-7 attending `Dr. Priya Mehta`. Redaction audit at `output/01_discharge_heart_failure_Okafor.audit.json`.
+
+**Industrial/OT — `…/6640_2-14-22_6.05restore/`**, prompt *"check the errors on the log…"*:
+
+```
+verdict: BLOCK  (industrial_ot, 49 findings)  →  no OT massager yet  →  HUMAN_REVIEW
+```
+
+Sample findings: OT-1 hostname `DESKTOP-9T2SPJS` (`rsmeta.xml`), OT-1 PROFINET addresses
+(`HOME/ippnio.xml`), OT-3 serial `6640-501456` (`system.xml`), OT-2/3 UAS grants + key
+(`uas_application_grants.xml`, `key.id`) — none of which were hard-coded in the policy.
+
+Committed sample verdicts: `policy-agent/examples/verdicts/*.verdict.json`.
 
 ## Validation & limitations
 

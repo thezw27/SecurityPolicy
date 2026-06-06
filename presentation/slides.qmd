@@ -1,5 +1,5 @@
 ---
-title: "ApexClaw"
+title: "AgentCOP"
 subtitle: "Keeping proprietary data off the cloud — a local policy gate + redaction loop"
 date: 2026-06-06
 format:
@@ -53,12 +53,12 @@ Four components, four owners — chained into one pipeline (`orchestrator.py`).
 
 ## The components {.smaller}
 
-| Stage | Does | Key idea |
+| Stage | Does | Built by |
 |------|------|----------|
-| **Box + local LLM** | Pulls relevant files, drafts an answer locally | cheap & private first |
-| **Hallucination check** | Is the local answer trustworthy? | if yes → stop, no cloud needed |
-| **Policy Agent** | Decides if data may go to the cloud | the gate — *this talk* |
-| **Redactor** | Removes the sensitive bits, proves it | fail-closed |
+| **Box + local LLM** | Pulls relevant files, drafts an answer locally | Zack |
+| **Hallucination check** | Is the local answer trustworthy? | Abhiyan & Nav |
+| **Policy Agent** | Decides if data may go to the cloud — *this talk* | Ammar |
+| **Redactor** | Removes the sensitive bits, proves it (fail-closed) | Emma |
 
 ::: {.fragment}
 Only data the local model *can't* handle ever reaches the gate — and only **clean** data ever reaches the cloud.
@@ -118,17 +118,63 @@ re-blocking the redactor's own output **forever.**
 That single agreement is what lets the loop **converge**.
 :::
 
-## It works — end to end {.smaller}
+## Example 1 — healthcare discharge {.smaller}
 
-Real discharge PDF, real OpenRouter model:
+**File:** `data/healthcare/01_discharge_heart_failure_Okafor.pdf` · **Prompt:** *"find any follow-ups"*
+
+The gate flagged real PHI (synthetic patient), then the loop cleared it:
+
+::: {.columns}
+::: {.column width="52%"}
+| rule | finding |
+|---|---|
+| HC-1 | name `Okafor, Emmanuel C.` |
+| HC-2 | MRN `NL-448821` |
+| HC-3 | DOB `09/14/1951` |
+| HC-7 | attending `Dr. Priya Mehta` |
+:::
+::: {.column width="48%"}
+```
+loop 1: BLOCK (14 findings)
+        → redactor: 50 redactions, CLEAR
+loop 2: ALLOW
+        → SEND_TO_CLOUD (redacted doc)
+```
+:::
+:::
+
+Verdict: `policy-agent/examples/verdicts/` · Redaction audit: `output/…Okafor.audit.json`
+
+## Example 2 — ABB controller backup {.smaller}
+
+**File:** `…/RobotStudio/…/6640_2-14-22_6.05restore/` · **Prompt:** *"check the errors on the log…"*
+
+Intake walked the backup tree and found secrets the policy never hard-coded:
+
+| rule | finding | from |
+|---|---|---|
+| OT-1 | hostname `DESKTOP-9T2SPJS` | `rsmeta.xml` |
+| OT-1 | PROFINET device addresses | `HOME/ippnio.xml` |
+| OT-3 | controller serial `6640-501456` | `system.xml` |
+| OT-2/3 | UAS grants + key | `uas_application_grants.xml`, `key.id` |
 
 ```
-loop 1: BLOCK  (14 PHI findings)  → redactor: 50 redactions, CLEAR
-loop 2: ALLOW                      → SEND_TO_CLOUD (redacted doc)
+verdict: BLOCK  (industrial_ot, 49 findings)  →  no OT massager yet  →  HUMAN_REVIEW
 ```
 
-- Validated **9/9** (synthetic + real data) — every real backup/PDF correctly blocked
-- The doc that reaches the cloud is the **redacted** one, never the original
+## Coverage at a glance {.smaller}
+
+Every case, real run — **9/9 validated**:
+
+| input | verdict | path |
+|---|---|---|
+| "what is ABB error 50056?" | **ALLOW** → cloud | generic, no attachment |
+| de-identified clinical question | **ALLOW** → cloud | no identifiers |
+| discharge PDF (PHI) | **BLOCK** → redact → **ALLOW** | `data/healthcare/*.pdf` |
+| controller backup | **BLOCK** → human review | `…/6640…restore/` |
+| opaque `.bin` attachment | **ESCALATE** → human | unreadable |
+
+Sample machine outputs committed at `policy-agent/examples/verdicts/*.verdict.json`
 
 ## Design choices & honest limits {.smaller}
 
@@ -144,6 +190,11 @@ loop 2: ALLOW                      → SEND_TO_CLOUD (redacted doc)
 - The hard part isn't any one component — it's the **contracts between them**
   (structured findings ↔ redaction tokens)
 - **Next:** an `industrial_ot` redactor, a shared confidence/threshold config, one `.env`
+
+::: {.fragment}
+**Team:** Zack (Box + local LLM) · Abhiyan & Nav (hallucination check) ·
+Ammar (policy agent) · Emma (redaction)
+:::
 
 ::: {.fragment}
 **Thank you** — questions?

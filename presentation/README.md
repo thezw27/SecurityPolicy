@@ -1,6 +1,6 @@
 # Presentation
 
-Quarto project for the ApexClaw policy-agent talk.
+Quarto project for the AgentCOP policy-agent talk.
 
 - **`slides.qmd`** — 5-minute RevealJS deck (the overall flow + components).
 - **`documentation.qmd`** — background documentation (deeper detail on each component + the contracts).

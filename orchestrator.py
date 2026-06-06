@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ApexClaw end-to-end orchestrator — ties the four components into one flow.
+AgentCOP end-to-end orchestrator — ties the four components into one flow.
 
     [box_openrouter_pipeline]  prompt + Box docs -> local LLM draft answer
             |
@@ -145,7 +145,7 @@ def run(prompt: str,
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="ApexClaw end-to-end policy + redaction pipeline.")
+    ap = argparse.ArgumentParser(description="AgentCOP end-to-end policy + redaction pipeline.")
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--doc", required=True, help="local document (PDF) or controller-backup folder")
     ap.add_argument("--draft", default=None, help="optional local-LLM draft answer (runs hallucination gate)")

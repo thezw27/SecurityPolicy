@@ -1,7 +1,7 @@
 """Model-agnostic provider layer.
 
 One interface, `complete(system, user, schema) -> dict`, with swappable backends so the same agent
-runs on a small cloud model (Gemini / OpenRouter) for ApexClaw, on Anthropic if a key is ever
+runs on a small cloud model (Gemini / OpenRouter) for AgentCOP, on Anthropic if a key is ever
 available, or fully offline (`mock`) for CI smoke tests.
 
 Selected via env vars:
@@ -163,7 +163,7 @@ class GeminiProvider(Provider):
 class OpenRouterProvider(Provider):
     name = "openrouter"
     # Default to a small, local-class model (8B) — representative of what would actually run on-prem
-    # as the "local LLM" in ApexClaw. Swap via POLICY_MODEL / --model for a larger one if desired.
+    # as the "local LLM" in AgentCOP. Swap via POLICY_MODEL / --model for a larger one if desired.
     default_model = "meta-llama/llama-3.1-8b-instruct"
 
     def complete(self, system: str, user: str, schema: Dict[str, Any]) -> Dict[str, Any]:

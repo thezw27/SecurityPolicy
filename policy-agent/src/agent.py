@@ -1,6 +1,6 @@
 """Policy Agent orchestrator.
 
-Pipeline (this is MY SCOPE in the ApexClaw flow, entered after the hallucination check says YES):
+Pipeline (this is MY SCOPE in the AgentCOP flow, entered after the hallucination check says YES):
 
     intake(prompt, source) -> DocumentBundle
       -> Stage 1: classify case (router)            -> ESCALATE if low confidence / unknown / mixed
